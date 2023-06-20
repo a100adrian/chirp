@@ -6,6 +6,8 @@ import relativeTime from "dayjs/plugin/relativeTime";
 import Image from "next/image";
 import { LoadingPage } from "~/components/loading";
 import { useState } from "react";
+import { toast } from "react-hot-toast";
+import PageLoader from "next/dist/client/page-loader";
 
 dayjs.extend(relativeTime);
 
@@ -18,6 +20,9 @@ const CreatePostWizard = () => {
     onSuccess: () => {
       setInput("");
       void ctx.posts.getAll.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message);
     }
   });
   if (!user) return null;
@@ -38,8 +43,17 @@ const CreatePostWizard = () => {
         value={input}
         disabled={isPosting}
         onChange={(e) => setInput(e.target.value)}
-      />
-      <button onClick={() => mutate({content: input}) }>Post</button>
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (input === "") return;
+            mutate({content: input})
+          } 
+        }}
+      />{input !== "" && !isPosting && (
+        <button onClick={() => mutate({content: input}) }>Post</button>
+      )}
+      {isPosting && <LoadingPage />}
     </div>
   );
 };
