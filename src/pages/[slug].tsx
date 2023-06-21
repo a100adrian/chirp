@@ -1,30 +1,24 @@
 import Head from "next/head";
 import { api } from "~/utils/api";
-import { createServerSideHelpers } from "@trpc/react-query/server";
-import superjson from "superjson";
-import { prisma } from "~/server/db";
-import { appRouter } from "~/server/api/root";
 import { type NextPage, type GetStaticProps } from "next";
 import { PageLayout } from "~/components/layout";
 import Image from "next/image";
 import { LoadingPage } from "~/components/loading";
 import PostView from "~/components/postview";
+import { generateSSGHelper } from "~/server/helpers/ssgHelper";
 
 export const getStaticProps: GetStaticProps = async (context) => {
-  const helpers = createServerSideHelpers({
-    router: appRouter,
-    ctx: { prisma, userId: null },
-    transformer: superjson,
-  });
+  
+  const ssg = generateSSGHelper();
 
   const slug = context.params?.slug;
   if (typeof slug !== "string") throw new Error("No slug");
 
-  await helpers.profile.getUserByUsername.prefetch({ username: slug });
+  await ssg.profile.getUserByUsername.prefetch({ username: slug });
 
   return {
     props: {
-      trpcState: helpers.dehydrate(),
+      trpcState: ssg.dehydrate(),
       username: slug,
     },
   };
@@ -37,15 +31,18 @@ export const getStaticPaths = () => {
   };
 };
 
-const ProfileFeed = (props: {userId: string}) => {
-
-  const { data, isLoading } = api.posts.getPostsByUserId.useQuery({ userId: props.userId });
+const ProfileFeed = (props: { userId: string }) => {
+  const { data, isLoading } = api.posts.getPostsByUserId.useQuery({
+    userId: props.userId,
+  });
   if (isLoading) return <LoadingPage />;
   if (!data || data.length === 0) return <div>No posts...</div>;
 
   return (
     <div className="flex flex-col">
-      {data.map((fullPost) => (<PostView key={fullPost.post.id} {...fullPost} />))}
+      {data.map((fullPost) => (
+        <PostView key={fullPost.post.id} {...fullPost} />
+      ))}
     </div>
   );
 };
@@ -62,14 +59,19 @@ const ProfilePage: NextPage<{ username: string }> = ({ username }) => {
       </Head>
       <PageLayout>
         <div className="relative h-36 bg-slate-600">
-          <Image src={data.profilePicture} alt="" 
-          width={128} height={128}
-          className="absolute rounded-full -mb-[64px] 
-          bottom-0 left-0 ml-4 border-4 border-black bg-black"
+          <Image
+            src={data.profilePicture}
+            alt=""
+            width={128}
+            height={128}
+            className="absolute bottom-0 left-0 
+          -mb-[64px] ml-4 rounded-full border-4 border-black bg-black"
           />
         </div>
         <div className="h-[64px]"></div>
-        <div className="p-4 text-2xl font-bold">{`@${data.username ?? ""}`}</div>
+        <div className="p-4 text-2xl font-bold">{`@${
+          data.username ?? ""
+        }`}</div>
         <div className="w-full border-b border-slate-400"></div>
         <ProfileFeed userId={data.id} />
       </PageLayout>
